@@ -1,0 +1,173 @@
+---
+title: "Using R for High-Performance Data Analytics"
+subtitle: "Seminar: Newest trends in High-Performance Data Analytics"
+output: 
+  html_notebook:
+    toc: true
+    number_sections: true
+author: "Christopher L. Luebbers"
+date: 2024-01-25
+---
+
+# Reading data
+Data source:
+
+https://www.cdc.gov/nchs/data_access/VitalStatsOnline.htm
+
+https://ftp.cdc.gov/pub/Health_Statistics/NCHS/Datasets/DVS/natality/Nat2018us.zip
+
+```{r}
+library(forcats) # easier factor handling
+```
+
+# Basic Applications of R
+## Data Manipulation
+
+```{r warning=FALSE}
+library(readr) # import data
+library(dplyr) # transform data
+data <- read_fwf("Nat2018PublicUS.c20190509.r20190717.txt", 
+                 col_positions = fwf_cols(Month = c(13,14),
+                                          Ane = c(537,537),
+                                          Men = c(538,538),
+                                          Cya = c(539,539),
+                                          Her = c(540,540),
+                                          Omp = c(541,541),
+                                          Gas = c(542,542),
+                                          Lim = c(549,549),
+                                          Cle = c(550,550),
+                                          Pal = c(551,551),
+                                          Dow = c(552,552),
+                                          Chr = c(553,553),
+                                          Hyp = c(554,554)), 
+                 col_types = "iffffffffffff") %>% 
+  group_by(Month) %>% 
+  summarise(Ane = sum(Ane == "Y"),
+            Men = sum(Men == "Y"),
+            Cya = sum(Cya == "Y"),
+            Her = sum(Her == "Y"),
+            Omp = sum(Omp == "Y"),
+            Gas = sum(Gas == "Y"),
+            Lim = sum(Lim == "Y"),
+            Cle = sum(Cle == "Y"),
+            Pal = sum(Pal == "Y"),
+            # numbers in thesis for Dow and Chr are wrong
+            # thesis only includes "P - pending", 
+            # but not "C - confirmed"
+            Dow = sum(Dow == "P"), 
+            Chr = sum(Chr == "P"), 
+            Hyp = sum(Hyp == "Y"))
+```
+
+```{r}
+# export to latex for presentation
+library(xtable)
+print(xtable(data, type = "latex"), file = "data.tex")
+```
+
+## Statistics
+
+```{r}
+# linear modeling
+# Note: this regression doesn't really make sense
+lm_example <- lm(Month ~ Ane + Men + Cya, data=data)
+summary(lm_example)
+```
+
+## Visualization
+
+```{r message=FALSE, warning=FALSE}
+library(tidyr)
+data_vis <- data %>% 
+  # make the table longer to visualize every birth anomaly
+  pivot_longer(cols = 2:13, names_to="anomalies", values_to = "cases") 
+
+# plotting
+library(ggplot2)
+ggplot(data_vis, aes(y = cases, color = anomalies)) +
+geom_boxplot() 
+```
+```{r message=FALSE}
+data_vis %>% 
+  filter(anomalies %in% c("Dow", "Chr")) %>% 
+ggplot(aes(x = Month, y = cases, color = anomalies)) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  coord_polar() +
+  facet_grid(.~anomalies) +
+  scale_x_continuous("Month", breaks = c(1,2,3,4,5,6,7,8,9,10,11,12)) +
+  theme_minimal()
+```
+
+# Advanced use of R
+
+```{r}
+library(tibble)
+month <- data %>% 
+  # functions require to have rownames not as data
+  column_to_rownames("Month")
+```
+
+## CPU computation
+```{r}
+time_cpu <- system.time(result_cpu <- stats::fisher.test(month,
+                                                  simulate.p.value = TRUE,
+                                                  B = 1015808))
+time_cpu[3]
+```
+
+## GPU computation
+
+```{r}
+library(devtools)
+# install assertive (not on CRAN)
+# gpuR needs this
+devtools::install_bitbucket("richierocks/assertive.properties")
+devtools::install_bitbucket("richierocks/assertive.datetimes")
+devtools::install_bitbucket("richierocks/assertive.data")
+devtools::install_bitbucket("richierocks/assertive.data.us")
+devtools::install_bitbucket("richierocks/assertive.data.uk")
+devtools::install_bitbucket("richierocks/assertive.code")
+devtools::install_bitbucket("richierocks/assertive")
+
+# install gpuR (no Version for my system on CRAN)
+Sys.setenv(OPENCL_INC = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/include/")
+Sys.setenv(OPECL_LIB32 = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/lib/Win32")
+Sys.setenv(OPECL_LIB32 = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/lib/x64")
+
+# install of gpuR FAILS because Windows I guess
+devtools::install_github("ruoyongxu/clrng")
+```
+
+```{r}
+streams <- createStreamsGpu(n = 256*64)
+month_gpu <- vclMatrix(month, type = "integer")
+time_gpu <- system.time(result_gpu <- clrng::fisher.sim(month_gpu, 1e6,
+                                              streams=streams, type="double",
+                                              returnStatistics=TRUE,
+                                              Nglobal = c(256,64)))
+```
+
+## Comparison
+```{r}
+# this would be the code if gpuR would work
+# result <- data.frame(Device = c("CPU", "GPU"), 
+#                      runtime = c(time_cpu[3], time_gpu[3]), 
+#                      p-value = c(result_cpu$p.value, result_gpu$p.value))
+
+# since my GPU computations do not work, I will show those from the thesis
+# results from thesis
+# GPU: time = 0.331, p-value = 0.403
+# CPU: time = 15.024, p-value = 0.404
+result <- data.frame("Device" = c("CPU", "GPU"), 
+                     "runtime" = c(15.024, 0.331), 
+                     "p value" = c(0.4035606, 0.403507))
+
+result
+```
+
+# next try
+```{r}
+devtools::install_github("nullsatz/gputools")
+```
+
