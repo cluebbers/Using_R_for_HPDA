@@ -9,8 +9,8 @@ The report investigates the use of R in high-performance data analytics (HPDA), 
 
 ```
 ├── README.md
-├── 2024-03-25_R_HPDA_Luebbers.pdf      # Detailed insights into leveraging R for high-performance data analytics, including memory management, GPU computing, parallel processing, and comparative analysis with Python.
-├── NTHPDA.Rmd                                # R notebook containing example code and benchmarks
+├── 2024-03-25_R_HPDA_Luebbers.pdf      # Detailed insights into leveraging R for high-performance data analytics
+├── NTHPDA.Rmd                          # R notebook containing example code and benchmarks
 ```
 ## Report Highlights
 
