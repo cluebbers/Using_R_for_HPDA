@@ -1,4 +1,4 @@
----
+ ---
 title: "Using R for High-Performance Data Analytics"
 subtitle: "Seminar: Newest trends in High-Performance Data Analytics"
 output: 
@@ -57,12 +57,6 @@ data <- read_fwf("Nat2018PublicUS.c20190509.r20190717.txt",
             Dow = sum(Dow == "P"), 
             Chr = sum(Chr == "P"), 
             Hyp = sum(Hyp == "Y"))
-```
-
-```{r}
-# export to latex for presentation
-library(xtable)
-print(xtable(data, type = "latex"), file = "data.tex")
 ```
 
 ## Statistics
@@ -164,10 +158,5 @@ result <- data.frame("Device" = c("CPU", "GPU"),
                      "p value" = c(0.4035606, 0.403507))
 
 result
-```
-
-# next try
-```{r}
-devtools::install_github("nullsatz/gputools")
 ```
 
